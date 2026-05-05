@@ -453,96 +453,311 @@ async function renderDashboardPage() {
   `;
 }
 
+window.flavorsData = {
+  'Ignite': ['Watermelon Ice', 'Mint', 'Strawberry Kiwi', 'Blueberry Ice', 'Mango Peach'],
+  'Oxbar': ['Grape Ice', 'Peach Mango Watermelon', 'Strawberry Ice', 'Clear', 'Cranberry Lemon'],
+  'Elf Bar': ['Blue Razz Ice', 'Strawberry Mango', 'Watermelon Bubblegum', 'Cranberry Grape'],
+  'Lost Mary': ['Cherry Ice', 'Pineapple Mango', 'Mad Blue', 'Juicy Peach'],
+  'Nikbar': ['Cool Mint', 'Strawberry Ice', 'Grape', 'Skittles'],
+  'Outra': ['Outro sabor...']
+};
+
+window.handleBrandChange = function(brand) {
+  const flavorSelect = document.getElementById('product-flavor');
+  const imgPreview = document.getElementById('product-img-preview');
+  const imgUrlInput = document.getElementById('product-img-url');
+  
+  flavorSelect.innerHTML = '<option value="">Selecione um sabor...</option>';
+  
+  if (brand && window.flavorsData[brand]) {
+    window.flavorsData[brand].forEach(flavor => {
+      flavorSelect.innerHTML += `<option value="${flavor}">${flavor}</option>`;
+    });
+    flavorSelect.innerHTML += `<option value="other">Outro (Digitar manualmente)</option>`;
+    
+    const brandSlug = brand.toLowerCase().replace(' ', '-');
+    const path = `/products/${brandSlug}/default.svg`;
+    imgPreview.src = path;
+    imgUrlInput.value = path;
+  } else {
+    imgPreview.src = '/products/placeholders/generic-product.svg';
+    imgUrlInput.value = '/products/placeholders/generic-product.svg';
+  }
+};
+
+window.handlePricingChange = function() {
+  const cost = parseFloat(document.getElementById('product-cost').value) || 0;
+  const sale = parseFloat(document.getElementById('product-price').value) || 0;
+  
+  const profit = sale - cost;
+  const margin = sale > 0 ? ((profit / sale) * 100).toFixed(2) : 0;
+  
+  document.getElementById('product-profit').value = profit.toFixed(2);
+  document.getElementById('product-margin').value = margin;
+  
+  window.handleDiscountChange();
+};
+
+window.handleDiscountChange = function() {
+  const promoSelect = document.getElementById('product-promo');
+  const discountFields = document.getElementById('discount-fields');
+  if(!promoSelect || !discountFields) return;
+  
+  const isPromo = promoSelect.value === 'true';
+  const discountType = document.getElementById('product-discount-type').value;
+  const discountValue = parseFloat(document.getElementById('product-discount-value').value) || 0;
+  const salePrice = parseFloat(document.getElementById('product-price').value) || 0;
+  
+  discountFields.style.display = isPromo ? 'grid' : 'none';
+  
+  let finalPrice = salePrice;
+  if (isPromo) {
+    if (discountType === 'percentage') {
+      finalPrice = salePrice - (salePrice * (discountValue / 100));
+    } else {
+      finalPrice = salePrice - discountValue;
+    }
+  }
+  
+  document.getElementById('product-final-price').value = finalPrice > 0 ? finalPrice.toFixed(2) : salePrice.toFixed(2);
+};
+
+window.saveProduct = async function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = 'Salvando...';
+
+  try {
+    const product = {
+      name: document.getElementById('product-name').value,
+      brand: document.getElementById('product-brand').value,
+      flavor: document.getElementById('product-flavor').value,
+      quantity: parseInt(document.getElementById('product-quantity').value) || 0,
+      cost_price: parseFloat(document.getElementById('product-cost').value) || 0,
+      sale_price: parseFloat(document.getElementById('product-price').value) || 0,
+      margin_percent: parseFloat(document.getElementById('product-margin').value) || 0,
+      profit_per_unit: parseFloat(document.getElementById('product-profit').value) || 0,
+      is_promotion: document.getElementById('product-promo').value === 'true',
+      discount_type: document.getElementById('product-discount-type').value,
+      discount_value: parseFloat(document.getElementById('product-discount-value').value) || 0,
+      final_price: parseFloat(document.getElementById('product-final-price').value) || 0,
+      image_url: document.getElementById('product-img-url').value,
+      status: 'active'
+    };
+
+    const { error } = await supabase.from('products').insert([product]);
+    if (error) throw error;
+    
+    alert('Produto salvo com sucesso!');
+    closeProductForm();
+    renderProductsPage(); // Refresh table
+  } catch (err) {
+    alert('Erro ao salvar produto: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = 'Salvar Produto';
+  }
+};
+
+window.showProductForm = function() {
+  document.getElementById('product-form-modal').style.display = 'flex';
+};
+
+window.closeProductForm = function() {
+  document.getElementById('product-form-modal').style.display = 'none';
+};
+
 // PRODUCTS PAGE
-function renderProductsPage() {
-  console.log('Rendering products page...');
+async function renderProductsPage() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="text-align:center; padding: 50px;">
+      <div style="font-size:3rem; animation: pulse 2s infinite;">⏳</div>
+      <h3 style="color:var(--text-secondary); margin-top:20px;">Sincronizando com Supabase...</h3>
+    </div>
+  `;
+
+  let productsHTML = '';
+  try {
+    const { data: products, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    
+    if (!error && products && products.length > 0) {
+      productsHTML = products.map(p => `
+        <tr style="background:rgba(255,255,255,0.02); border-radius:8px;">
+          <td><img src="${p.image_url || '/products/placeholders/generic-product.svg'}" style="width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid var(--border);"></td>
+          <td>
+            <div style="font-weight:bold;">${p.name}</div>
+            <div style="font-size:0.75rem; color:var(--gray);">${p.brand} • ${p.flavor}</div>
+          </td>
+          <td>${p.quantity} un</td>
+          <td>R$ ${p.cost_price.toFixed(2)}</td>
+          <td style="font-weight:bold; color:var(--purple);">R$ ${p.sale_price.toFixed(2)}</td>
+          <td>
+            ${p.is_promotion 
+              ? `<span style="background:var(--pink); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">R$ ${p.final_price.toFixed(2)}</span>`
+              : '-'
+            }
+          </td>
+          <td style="color:#22c55e;">${p.margin_percent}%</td>
+          <td><span class="status-badge status-${p.status || 'active'}">${p.status === 'active' ? 'Ativo' : 'Inativo'}</span></td>
+          <td>
+            <button class="action-btn" onclick="alert('Edição de produto em breve')">✏️</button>
+            <button class="action-btn danger" onclick="alert('Exclusão em breve')">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+    } else {
+      productsHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary)">Nenhum produto cadastrado ainda.</td></tr>';
+    }
+  } catch(e) {
+    productsHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--pink)">Erro de conexão com o banco de dados.</td></tr>';
+  }
+
   document.getElementById('page-content').innerHTML = `
     <div class="section">
       <div class="section-header">
-        <h2 class="section-title">Produtos</h2>
-        <button class="btn-primary" onclick="showProductForm()">+ Novo Produto</button>
+        <h2 class="section-title">📦 Catálogo de Produtos</h2>
+        <button class="btn-primary" onclick="showProductForm()" style="display:flex; align-items:center; gap:8px;">
+          <span>+</span> Novo Produto
+        </button>
       </div>
 
-      <input type="text" class="search-box" placeholder="Buscar produtos..." onkeyup="filterProducts(this.value)">
+      <input type="text" class="search-box" placeholder="Buscar por nome, marca ou sabor..." style="width:100%; max-width:400px; margin-bottom:20px;">
 
-      <table style="margin-top: 20px;" id="products-table">
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>Nome</th>
-            <th>Categoria</th>
-            <th>Preço Venda</th>
-            <th>Preço Custo</th>
-            <th>Margem</th>
-            <th>Estoque</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${mockData.products.map(product => {
-            const margin = ((product.price - product.costPrice) / product.price * 100).toFixed(1);
-            return `
-              <tr data-sku="${product.sku}">
-                <td>${product.sku}</td>
-                <td>${product.name}</td>
-                <td>${product.category}</td>
-                <td>R$ ${product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                <td>R$ ${product.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                <td class="profit-column">${margin}%</td>
-                <td>${product.stock}</td>
-                <td><span class="status-badge status-${product.status === 'active' ? 'active' : 'inactive'}">${product.status === 'active' ? 'Ativo' : 'Inativo'}</span></td>
-                <td>
-                  <button class="action-btn" onclick="editProduct(${product.id})">✏️</button>
-                  <button class="action-btn danger" onclick="deleteProduct(${product.id}, '${product.name}')">🗑️</button>
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead style="background:rgba(0,0,0,0.3);">
+            <tr>
+              <th>IMG</th>
+              <th>PRODUTO / MARCA</th>
+              <th>QUANTIDADE</th>
+              <th>CUSTO</th>
+              <th>VENDA</th>
+              <th>PROMO</th>
+              <th>MARGEM</th>
+              <th>STATUS</th>
+              <th>AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody style="font-size:0.9rem;">
+            ${productsHTML}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div id="product-form-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000;">
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 30px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
-        <h2 style="margin-bottom: 20px; color: var(--primary);">Novo Produto</h2>
+    <!-- MODAL DE CADASTRO DE PRODUTO -->
+    <div id="product-form-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); align-items: center; justify-content: center; z-index: 1000;">
+      <div style="background: var(--bg-dark); border: 1px solid var(--border); border-radius: 16px; padding: 30px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 50px rgba(0,0,0,0.5);">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; border-bottom:1px solid var(--border); padding-bottom:15px;">
+          <h2 style="font-family:'Syne', sans-serif; font-size:1.5rem; color:var(--purple);">Cadastrar Novo Produto</h2>
+          <button onclick="closeProductForm()" style="background:none; border:none; color:var(--gray); font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
 
         <form onsubmit="saveProduct(event)">
-          <div class="form-group">
-            <label>SKU</label>
-            <input type="text" id="product-sku" required>
-          </div>
+          
+          <div style="display:grid; grid-template-columns: 1fr 200px; gap:30px;">
+            <!-- COLUNA ESQUERDA: DADOS -->
+            <div>
+              <div class="form-group">
+                <label>Nome do Produto (Título Comercial)</label>
+                <input type="text" id="product-name" placeholder="Ex: Pod Descartável Ignite V50 5000 Puffs" required>
+              </div>
 
-          <div class="form-group">
-            <label>Nome</label>
-            <input type="text" id="product-name" required>
-          </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Marca</label>
+                  <select id="product-brand" onchange="handleBrandChange(this.value)" required>
+                    <option value="">Selecione...</option>
+                    <option value="Ignite">Ignite</option>
+                    <option value="Oxbar">Oxbar</option>
+                    <option value="Elf Bar">Elf Bar</option>
+                    <option value="Lost Mary">Lost Mary</option>
+                    <option value="Nikbar">Nikbar</option>
+                    <option value="Outra">Outra</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Sabor</label>
+                  <select id="product-flavor" required>
+                    <option value="">Selecione a marca primeiro</option>
+                  </select>
+                </div>
+              </div>
 
-          <div class="form-group">
-            <label>Categoria</label>
-            <input type="text" id="product-category" required>
-          </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                  <label>Qtd em Estoque</label>
+                  <input type="number" id="product-quantity" value="0" min="0" required>
+                </div>
+                <div class="form-group">
+                  <label>Preço de Custo (R$)</label>
+                  <input type="number" id="product-cost" step="0.01" value="0.00" oninput="handlePricingChange()" required>
+                </div>
+                <div class="form-group">
+                  <label>Preço de Venda (R$)</label>
+                  <input type="number" id="product-price" step="0.01" value="0.00" oninput="handlePricingChange()" required>
+                </div>
+              </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div class="form-group">
-              <label>Preço de Custo (R$)</label>
-              <input type="number" id="product-cost" step="0.01" required>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom:20px; padding:15px; background:rgba(34, 197, 94, 0.05); border:1px solid rgba(34, 197, 94, 0.2); border-radius:8px;">
+                <div>
+                  <label style="color:var(--gray); font-size:0.75rem;">MARGEM DE LUCRO (%)</label>
+                  <input type="text" id="product-margin" value="0" readonly style="background:transparent; border:none; color:#22c55e; font-weight:bold; font-size:1.2rem; padding:0;">
+                </div>
+                <div>
+                  <label style="color:var(--gray); font-size:0.75rem;">LUCRO POR UNIDADE (R$)</label>
+                  <input type="text" id="product-profit" value="0.00" readonly style="background:transparent; border:none; color:#22c55e; font-weight:bold; font-size:1.2rem; padding:0;">
+                </div>
+              </div>
+
+              <div class="form-group" style="padding:15px; background:rgba(236,72,153,0.05); border:1px solid rgba(236,72,153,0.2); border-radius:8px;">
+                <label>Em Promoção?</label>
+                <select id="product-promo" onchange="handleDiscountChange()">
+                  <option value="false">Não</option>
+                  <option value="true">Sim</option>
+                </select>
+
+                <div id="discount-fields" style="display:none; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:15px;">
+                  <div>
+                    <label style="font-size:0.75rem;">Tipo</label>
+                    <select id="product-discount-type" onchange="handleDiscountChange()">
+                      <option value="fixed">Valor Fixo (R$)</option>
+                      <option value="percentage">Porcentagem (%)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem;">Desconto</label>
+                    <input type="number" id="product-discount-value" step="0.01" value="0" oninput="handleDiscountChange()">
+                  </div>
+                  <div>
+                    <label style="font-size:0.75rem;">Preço Final</label>
+                    <input type="text" id="product-final-price" readonly style="color:var(--pink); font-weight:bold; border-color:var(--pink);">
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            <div class="form-group">
-              <label>Preço de Venda (R$)</label>
-              <input type="number" id="product-price" step="0.01" required>
+            <!-- COLUNA DIREITA: IMAGEM -->
+            <div>
+              <div class="form-group">
+                <label>Imagem do Produto</label>
+                <div style="width:100%; height:200px; background:#000; border:1px dashed var(--gray); border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:10px;">
+                  <img id="product-img-preview" src="/products/placeholders/generic-product.svg" style="max-width:100%; max-height:100%; object-fit:contain;">
+                </div>
+                <input type="text" id="product-img-url" value="/products/placeholders/generic-product.svg" style="font-size:0.8rem;" placeholder="URL da Imagem">
+                <p style="font-size:0.75rem; color:var(--gray); margin-top:5px; text-align:center;">Imagem preenchida automaticamente pela marca.</p>
+              </div>
             </div>
+
           </div>
 
-          <div class="form-group">
-            <label>Estoque</label>
-            <input type="number" id="product-stock" value="0" required>
-          </div>
-
-          <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button type="submit" class="btn-primary" style="flex: 1;">Salvar</button>
-            <button type="button" class="action-btn danger" onclick="closeProductForm()" style="flex: 1; padding: 10px;">Cancelar</button>
+          <div style="display: flex; gap: 15px; margin-top: 30px; border-top:1px solid var(--border); padding-top:20px;">
+            <button type="button" class="action-btn danger" onclick="closeProductForm()" style="flex: 1; padding: 12px; font-weight:bold; text-align:center; border-radius:8px;">Cancelar</button>
+            <button type="submit" class="btn-primary" style="flex: 2; padding: 12px; font-weight:bold; text-align:center;">Salvar Produto</button>
           </div>
         </form>
       </div>
