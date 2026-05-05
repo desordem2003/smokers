@@ -8,6 +8,8 @@ import { Cart } from './pages/Cart.js'
 import { Checkout } from './pages/Checkout.js'
 import { Account } from './pages/Account.js'
 import { Admin } from './pages/Admin.js'
+import { RecoverPassword } from './pages/RecoverPassword.js'
+import { ResetPassword } from './pages/ResetPassword.js'
 
 // --- STATE ---
 let products = [];
@@ -27,6 +29,8 @@ const routes = {
   '/minha-conta/pedidos': () => Account('pedidos'),
   '/admin/dashboard': () => Admin('dashboard'),
   '/admin/produtos': () => Admin('produtos'),
+  '/recuperar-senha': RecoverPassword,
+  '/redefinir-senha': ResetPassword,
   '/produto': ProductDetails
 };
 
@@ -70,18 +74,26 @@ function setupNavLinks() {
 
 // --- LOGIC ---
 async function fetchProducts() {
-  const { data, error } = await supabase.from('products').select('*').eq('is_active', true);
-  return data || [];
+  try {
+    const { data, error } = await supabase.from('products').select('*');
+    if (error) throw error;
+    console.log('Produtos carregados:', data);
+    return data || [];
+  } catch (err) {
+    console.error('Erro ao buscar produtos:', err);
+    return [];
+  }
 }
 
 function createProductCard(p) {
+  const imgSrc = p.img.startsWith('http') ? p.img : (p.img.startsWith('/') ? p.img : '/' + p.img);
   return `
     <div class="product-card">
       ${p.badge ? `<span class="card-badge">${p.badge}</span>` : ''}
-      <a href="/produto/${p.id}" class="card-img-wrap nav-link"><img src="${p.img}"></a>
+      <a href="/produto/${p.id}" class="card-img-wrap nav-link"><img src="${imgSrc}" onerror="this.src='/assets/pod_product.png'"></a>
       <div class="card-info">
         <a href="/produto/${p.id}" class="card-name nav-link">${p.name}</a>
-        <div class="card-price-row"><span class="price-current">R$ ${p.price.toFixed(2)}</span></div>
+        <div class="card-price-row"><span class="price-current">R$ ${p.price?.toFixed(2) || '0.00'}</span></div>
         <a href="#" class="btn-buy" onclick="handleAddToCart(event, '${p.id}')">Comprar</a>
       </div>
     </div>
@@ -89,11 +101,35 @@ function createProductCard(p) {
 }
 
 async function renderGrids() {
-  products = await fetchProducts();
-  const grids = { 'grid-mais-vendidos': products.slice(0, 4), 'grid-ignite': products.filter(p => p.name.includes('Ignite')), 'grid-todos': products };
-  for (const [id, list] of Object.entries(grids)) {
+  const grids = ['grid-mais-vendidos', 'grid-ignite', 'grid-todos'];
+  grids.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = list.map(createProductCard).join('');
+    if (el) el.innerHTML = '<div class="loading-status">Buscando produtos no banco...</div>';
+  });
+
+  products = await fetchProducts();
+  
+  if (products.length === 0) {
+    grids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div class="error-status">Nenhum produto encontrado no banco. Verifique sua tabela no Supabase.</div>';
+    });
+    return;
+  }
+
+  const gridData = { 
+    'grid-mais-vendidos': products.slice(0, 4), 
+    'grid-ignite': products.filter(p => p.name?.toLowerCase().includes('ignite')), 
+    'grid-todos': products 
+  };
+
+  for (const [id, list] of Object.entries(gridData)) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = list.length > 0 
+        ? list.map(createProductCard).join('') 
+        : '<div class="error-status">Nenhum produto nesta categoria.</div>';
+    }
   }
 }
 
@@ -107,7 +143,8 @@ async function renderCatalogGrid() {
 async function setupProductDetailsLogic(id) {
   const { data: p } = await supabase.from('products').select('*').eq('id', id).single();
   if (!p) return;
-  document.getElementById('detail-img').src = p.img;
+  const imgSrc = p.img.startsWith('http') ? p.img : (p.img.startsWith('/') ? p.img : '/' + p.img);
+  document.getElementById('detail-img').src = imgSrc;
   document.getElementById('detail-name').textContent = p.name;
   document.getElementById('detail-category').textContent = p.category;
   document.getElementById('detail-price').textContent = `R$ ${p.price.toFixed(2)}`;
@@ -133,5 +170,51 @@ function updateCartUI() {
 }
 
 window.handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
+
+async function setupLoginLogic() {
+  const form = document.getElementById('login-form');
+  if (!form) return;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) alert('Erro no login: ' + error.message);
+    else { alert('Bem-vindo!'); navigate('/'); }
+  };
+}
+
+async function setupRegisterLogic() {
+  const form = document.getElementById('register-form');
+  const cpfInput = document.getElementById('cpf');
+  if (!form) return;
+
+  if (cpfInput) {
+    cpfInput.oninput = (e) => {
+      let v = e.target.value.replace(/\D/g, "");
+      if (v.length > 11) v = v.substring(0, 11);
+      v = v.replace(/(\d{3})(\d)/, "$1.$2");
+      v = v.replace(/(\d{3})(\d)/, "$1.$2");
+      v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+      e.target.value = v;
+    };
+  }
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    const full_name = e.target.name.value;
+    const cpf = e.target.cpf.value;
+
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: { data: { full_name, cpf } }
+    });
+    if (error) alert('Erro no registro: ' + error.message);
+    else alert('Conta criada! Verifique seu e-mail.');
+  };
+}
 
 document.addEventListener('DOMContentLoaded', () => { handleRoute(); updateCartUI(); });

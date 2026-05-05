@@ -2,7 +2,7 @@ export const Home = async () => {
   return `
     <section id="hero">
       <div class="hero-image-container">
-        <img src="assets/hero_banner.jpg" alt="SMOKE/RS Hero" class="hero-bg-img">
+        <img src="/assets/hero_banner.jpg" alt="SMOKE/RS Hero" class="hero-bg-img" fetchpriority="high" loading="eager">
         <div class="hero-overlay"></div>
         <div class="hero-info-bar">
           <div class="container info-flex">

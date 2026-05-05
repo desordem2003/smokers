@@ -237,16 +237,15 @@ img {
 .hero-image-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
-  max-height: 700px;
+  height: auto;
   overflow: hidden;
   background: #000;
 }
 
 .hero-bg-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
 
@@ -434,6 +433,21 @@ img {
   padding: 60px 0;
   text-align: center;
   color: var(--gray);
+}
+
+.loading-status, .error-status {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  background: var(--bg-dark);
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  color: var(--gray);
+}
+
+.error-status {
+  color: var(--pink);
+  border-color: var(--pink);
 }
 
 /* RESPONSIVE */
