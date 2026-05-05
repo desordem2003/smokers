@@ -14,6 +14,75 @@ import { ResetPassword } from './pages/ResetPassword.js'
 // --- STATE ---
 let products = [];
 let cart = JSON.parse(localStorage.getItem('smokers-cart')) || [];
+let currentUser = null;
+
+// --- AUTH LOGIC ---
+async function setupAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  await handleAuthChange(session);
+
+  supabase.auth.onAuthStateChange(async (_event, session) => {
+    await handleAuthChange(session);
+  });
+  
+  const userBtn = document.getElementById('user-btn');
+  const userDropdown = document.getElementById('user-dropdown');
+  
+  if (userBtn) {
+    userBtn.onclick = (e) => {
+      e.preventDefault();
+      if (currentUser) {
+        userDropdown.classList.toggle('show');
+      } else {
+        navigate('/login');
+      }
+    };
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#user-menu-container') && userDropdown) {
+      userDropdown.classList.remove('show');
+    }
+  });
+}
+
+async function handleAuthChange(session) {
+  if (session) {
+    const user = session.user;
+    let name = user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0];
+    let isAdmin = false;
+
+    try {
+      const { data: profile } = await supabase.from('profiles').select('full_name, is_admin').eq('id', user.id).single();
+      if (profile) {
+        if (profile.full_name) name = profile.full_name;
+        isAdmin = profile.is_admin === true;
+      }
+    } catch(e) {}
+
+    currentUser = { ...user, name, isAdmin };
+    updateUserUI(true);
+  } else {
+    currentUser = null;
+    updateUserUI(false);
+  }
+}
+
+function updateUserUI(isLogged) {
+  const nameEl = document.getElementById('user-display-name');
+  const emailEl = document.getElementById('dropdown-email');
+  const adminLink = document.getElementById('admin-panel-link');
+  const dropdown = document.getElementById('user-dropdown');
+
+  if (isLogged && currentUser) {
+    if (nameEl) nameEl.textContent = currentUser.name.split(' ')[0];
+    if (emailEl) emailEl.textContent = currentUser.email;
+    if (adminLink) adminLink.style.display = currentUser.isAdmin ? 'block' : 'none';
+  } else {
+    if (nameEl) nameEl.textContent = 'Minha Conta';
+    if (dropdown) dropdown.classList.remove('show');
+  }
+}
 
 // --- ROUTER ---
 const routes = {
@@ -169,7 +238,13 @@ function updateCartUI() {
   if (count) count.textContent = cart.length;
 }
 
-window.handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
+window.handleLogout = async (e) => {
+  if (e) e.preventDefault();
+  await supabase.auth.signOut();
+  const dropdown = document.getElementById('user-dropdown');
+  if(dropdown) dropdown.classList.remove('show');
+  navigate('/');
+};
 
 async function setupLoginLogic() {
   const form = document.getElementById('login-form');
@@ -217,4 +292,8 @@ async function setupRegisterLogic() {
   };
 }
 
-document.addEventListener('DOMContentLoaded', () => { handleRoute(); updateCartUI(); });
+document.addEventListener('DOMContentLoaded', async () => { 
+  await setupAuth();
+  handleRoute(); 
+  updateCartUI(); 
+});
