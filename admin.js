@@ -1,12 +1,53 @@
+import { supabase } from './supabase.js';
+
 /* =============================================
    SMOKE/RS - ADMIN PANEL LOGIC
    ============================================= */
 
 // State
-let currentUser = { username: 'Admin' };
+let currentUser = { username: '' };
 let currentPage = 'dashboard';
 
-// Sample Data
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+  const root = document.getElementById('admin-root');
+  
+  // Bloqueio inicial imediato (Remove qualquer conteúdo prévio para segurança)
+  root.innerHTML = '';
+  document.body.style.display = 'none'; 
+
+  try {
+    // 1. Verifica se existe sessão válida no Supabase
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) throw new Error('No session');
+
+    // 2. Busca o perfil do usuário para verificar o cargo
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name, is_admin')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile || profile.is_admin !== true) {
+      throw new Error('Not admin');
+    }
+
+    // Se chegou aqui, é admin confirmado!
+    currentUser.username = profile.full_name || session.user.email;
+    document.body.style.display = 'block'; // Mostra o body novamente
+    renderDashboard();
+
+  } catch (error) {
+    // Falha na validação: Simula página quebrada/inexistente sem dar pistas
+    document.body.innerHTML = '';
+    document.body.style.display = 'block';
+    document.body.style.backgroundColor = '#ffffff'; // Fundo branco padrão
+    // Não mostra NENHUMA mensagem de "acesso negado"
+  }
+});
+
+// Sample Data (Deve ser movido para o banco de dados futuramente)
 const mockData = {
   products: [
     { id: 1, sku: 'IGN-V50', name: 'Ignite V50 Watermelon Ice', category: 'Pod', price: 129.90, costPrice: 60, stock: 45, status: 'active' },
@@ -61,11 +102,6 @@ const mockData = {
     avgTicket: 387.28
   }
 };
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-  renderDashboard();
-});
 
 // Render Dashboard
 function renderDashboard() {

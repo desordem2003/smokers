@@ -1,6 +1,25 @@
 import { supabase } from '../supabase.js'
 
 export const Admin = async (subpage = 'dashboard') => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('No session');
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!profile || profile.is_admin !== true) {
+      throw new Error('Not admin');
+    }
+  } catch (error) {
+    // Retorna string vazia ou html simulando que a página não existe
+    // Sem revelar que é área restrita
+    return `<div style="min-height: 100vh; background: #fff;"></div>`; 
+  }
+
   const renderContent = async () => {
     switch(subpage) {
       case 'dashboard': return `<div class="admin-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px;"><div style="background: var(--bg-dark); padding: 25px; border-radius: 20px; border: 1px solid var(--border);"><p style="color: var(--gray);">Vendas</p><h4 style="font-size: 1.8rem; color: var(--purple);">R$ 12.450</h4></div></div>`;
