@@ -301,13 +301,27 @@ async function setupRegisterLogic() {
     const full_name = e.target.name.value;
     const cpf = e.target.cpf.value;
 
+    // 1. Valida no banco se o CPF já está em uso (usando função RPC segura)
+    const { data: cpfExists, error: rpcError } = await supabase.rpc('check_cpf_exists', { p_cpf: cpf });
+    
+    if (cpfExists) {
+      alert('ERRO: Este CPF já está cadastrado no sistema! Por favor, faça login ou recupere sua senha.');
+      return; // Interrompe o cadastro
+    }
+
+    // 2. Se o CPF for inédito, prossegue com a criação da conta
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: { data: { full_name, cpf } }
     });
-    if (error) alert('Erro no registro: ' + error.message);
-    else alert('Conta criada! Verifique seu e-mail.');
+    
+    if (error) {
+      alert('Erro no registro: ' + error.message);
+    } else {
+      alert('Conta criada com sucesso! Você já pode fazer login.');
+      navigate('/login');
+    }
   };
 }
 
