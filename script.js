@@ -1,66 +1,137 @@
-/* =============================================
-   SMOKE/RS - LOGIC
-   ============================================= */
+import { supabase } from './supabase.js'
+import { Home } from './pages/Home.js'
+import { Login } from './pages/Login.js'
+import { Register } from './pages/Register.js'
+import { Catalog } from './pages/Catalog.js'
+import { ProductDetails } from './pages/ProductDetails.js'
+import { Cart } from './pages/Cart.js'
+import { Checkout } from './pages/Checkout.js'
+import { Account } from './pages/Account.js'
+import { Admin } from './pages/Admin.js'
 
-const products = [
-  { id: 1, category: 'pod', name: 'Ignite V50 Watermelon Ice', price: 129.90, oldPrice: 159.90, img: 'assets/pod_product.png', badge: '15% OFF' },
-  { id: 2, category: 'pod', name: 'Elfbar BC5000 Blue Razz', price: 119.90, oldPrice: 139.90, img: 'assets/pod_product.png', badge: 'NOVO' },
-  { id: 3, category: 'pod', name: 'Oxbar G8000 Mango Ice', price: 139.90, oldPrice: 169.90, img: 'assets/pod_product.png', badge: 'PROMO' },
-  { id: 4, category: 'pod', name: 'Nikbar 6000 Puffs Strawberry', price: 109.90, oldPrice: null, img: 'assets/pod_product.png', badge: null },
-  { id: 5, category: 'vape', name: 'Vaporesso XROS 3 Nano', price: 289.90, oldPrice: 329.90, img: 'assets/vape_device_hero.png', badge: 'TOP' },
-  { id: 6, category: 'vape', name: 'Geekvape L200 Kit', price: 549.90, oldPrice: 599.90, img: 'assets/vape_device_hero.png', badge: 'PRO' },
-  { id: 7, category: 'essencia', name: 'Juice BLVK Pink 60ml', price: 79.90, oldPrice: 99.90, img: 'assets/eliquid_product.png', badge: null },
-  { id: 8, category: 'essencia', name: 'Nasty Juice Cush Man', price: 89.90, oldPrice: null, img: 'assets/eliquid_product.png', badge: 'HOT' }
-];
+// --- STATE ---
+let products = [];
+let cart = JSON.parse(localStorage.getItem('smokers-cart')) || [];
+
+// --- ROUTER ---
+const routes = {
+  '/': Home,
+  '/login': Login,
+  '/registro': Register,
+  '/produtos': Catalog,
+  '/carrinho': Cart,
+  '/checkout/1': () => Checkout('1'),
+  '/checkout/2': () => Checkout('2'),
+  '/checkout/3': () => Checkout('3'),
+  '/minha-conta/perfil': () => Account('perfil'),
+  '/minha-conta/pedidos': () => Account('pedidos'),
+  '/admin/dashboard': () => Admin('dashboard'),
+  '/admin/produtos': () => Admin('produtos'),
+  '/produto': ProductDetails
+};
+
+window.navigate = navigate;
+
+async function navigate(path) {
+  window.history.pushState({}, '', path);
+  await handleRoute();
+}
+
+async function handleRoute() {
+  const path = window.location.pathname;
+  const app = document.getElementById('app');
+  let component = routes[path];
+  let id = null;
+
+  if (!component && path.startsWith('/produto/')) {
+    component = routes['/produto'];
+    id = path.split('/')[2];
+  }
+
+  if (!component) component = routes['/'];
+  app.innerHTML = await component(id);
+
+  if (path === '/') { await renderGrids(); renderCategories(); }
+  else if (path === '/produtos') { await renderCatalogGrid(); }
+  else if (path.startsWith('/produto/')) { await setupProductDetailsLogic(id); }
+  else if (path === '/login') { setupLoginLogic(); }
+  else if (path === '/registro') { setupRegisterLogic(); }
+
+  setupNavLinks();
+}
+
+window.onpopstate = handleRoute;
+
+function setupNavLinks() {
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.onclick = (e) => { e.preventDefault(); navigate(link.getAttribute('href')); };
+  });
+}
+
+// --- LOGIC ---
+async function fetchProducts() {
+  const { data, error } = await supabase.from('products').select('*').eq('is_active', true);
+  return data || [];
+}
 
 function createProductCard(p) {
   return `
     <div class="product-card">
       ${p.badge ? `<span class="card-badge">${p.badge}</span>` : ''}
-      <div class="card-img-wrap">
-        <img src="${p.img}" alt="${p.name}" loading="lazy">
-      </div>
+      <a href="/produto/${p.id}" class="card-img-wrap nav-link"><img src="${p.img}"></a>
       <div class="card-info">
-        <h3 class="card-name">${p.name}</h3>
-        <div class="card-price-row">
-          ${p.oldPrice ? `<span class="price-old">R$ ${p.oldPrice.toFixed(2)}</span>` : ''}
-          <span class="price-current">R$ ${p.price.toFixed(2)}</span>
-        </div>
-        <a href="#" class="btn-buy" onclick="addToCart(event, ${p.id})">Comprar Agora</a>
+        <a href="/produto/${p.id}" class="card-name nav-link">${p.name}</a>
+        <div class="card-price-row"><span class="price-current">R$ ${p.price.toFixed(2)}</span></div>
+        <a href="#" class="btn-buy" onclick="handleAddToCart(event, '${p.id}')">Comprar</a>
       </div>
     </div>
   `;
 }
 
-function renderGrids() {
-  const grids = {
-    'grid-mais-vendidos': products.slice(0, 4),
-    'grid-ignite': products.filter(p => p.name.includes('Ignite')),
-    'grid-todos': products
-  };
-
+async function renderGrids() {
+  products = await fetchProducts();
+  const grids = { 'grid-mais-vendidos': products.slice(0, 4), 'grid-ignite': products.filter(p => p.name.includes('Ignite')), 'grid-todos': products };
   for (const [id, list] of Object.entries(grids)) {
     const el = document.getElementById(id);
-    if (el) {
-      el.innerHTML = list.map(createProductCard).join('');
-    }
+    if (el) el.innerHTML = list.map(createProductCard).join('');
   }
 }
 
-let cartCount = 0;
-window.addToCart = function(e, id) {
+async function renderCatalogGrid() {
+  products = await fetchProducts();
+  const grid = document.getElementById('grid-catalog');
+  if (grid) grid.innerHTML = products.map(createProductCard).join('');
+  setupNavLinks();
+}
+
+async function setupProductDetailsLogic(id) {
+  const { data: p } = await supabase.from('products').select('*').eq('id', id).single();
+  if (!p) return;
+  document.getElementById('detail-img').src = p.img;
+  document.getElementById('detail-name').textContent = p.name;
+  document.getElementById('detail-category').textContent = p.category;
+  document.getElementById('detail-price').textContent = `R$ ${p.price.toFixed(2)}`;
+  document.getElementById('add-to-cart-btn').onclick = (e) => handleAddToCart(e, p.id);
+}
+
+function renderCategories() {
+  const menu = document.getElementById('category-menu');
+  if (!menu) return;
+  const cats = ['Elfbar', 'Nikbar', 'Ignite', 'Todos'];
+  menu.innerHTML = cats.map(c => `<li><a href="#" class="nav-link">${c}</a></li>`).join('');
+}
+
+window.handleAddToCart = (e, id) => {
   e.preventDefault();
-  cartCount++;
-  const counter = document.querySelector('.cart-count');
-  if (counter) {
-    counter.textContent = cartCount;
-    counter.style.transform = 'scale(1.2)';
-    setTimeout(() => counter.style.transform = 'scale(1)', 200);
-  }
-  alert('Produto adicionado ao carrinho!');
+  const p = products.find(p => String(p.id) === String(id));
+  if (p) { cart.push(p); localStorage.setItem('smokers-cart', JSON.stringify(cart)); updateCartUI(); alert('Adicionado!'); }
 };
 
-// INITIALIZATION
-document.addEventListener('DOMContentLoaded', () => {
-  renderGrids();
-});
+function updateCartUI() {
+  const count = document.querySelector('.cart-count');
+  if (count) count.textContent = cart.length;
+}
+
+window.handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
+
+document.addEventListener('DOMContentLoaded', () => { handleRoute(); updateCartUI(); });

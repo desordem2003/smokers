@@ -1,0 +1,13 @@
+/* CATALOG STYLES */
+.catalog-container { display: grid; grid-template-columns: 280px 1fr; gap: 40px; padding: 40px 0; }
+.filters-sidebar { background: var(--bg-dark); border: 1px solid var(--border); border-radius: 20px; padding: 25px; height: fit-content; position: sticky; top: 100px; }
+.filter-group { margin-bottom: 30px; }
+.filter-group h3 { font-size: 1rem; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--white); }
+.filter-options { display: flex; flex-direction: column; gap: 12px; }
+.filter-option { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--gray); cursor: pointer; transition: var(--transition); }
+.filter-option:hover { color: var(--purple); }
+.filter-option input { accent-color: var(--purple); }
+.catalog-main { display: flex; flex-direction: column; gap: 30px; }
+.catalog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.catalog-sort select { background: var(--bg-dark); color: var(--white); border: 1px solid var(--border); padding: 8px 15px; border-radius: 10px; outline: none; }
+@media (max-width: 992px) { .catalog-container { grid-template-columns: 1fr; } .filters-sidebar { display: none; } }
