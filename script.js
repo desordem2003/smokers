@@ -111,8 +111,27 @@ async function navigate(path) {
 }
 
 async function handleRoute() {
-  const path = window.location.pathname;
+  let path = window.location.pathname;
   const app = document.getElementById('app');
+
+  // Proteção de rotas
+  const isAuthRoute = path === '/login' || path === '/registro' || path === '/recuperar-senha' || path === '/redefinir-senha';
+  const isProtectedRoute = path.startsWith('/minha-conta') || path.startsWith('/checkout');
+
+  if (currentUser && isAuthRoute) {
+    window.history.replaceState({}, '', '/');
+    path = '/';
+  } else if (!currentUser && isProtectedRoute) {
+    window.history.replaceState({}, '', '/login');
+    path = '/login';
+  }
+
+  // Proteção rotas SPA admin
+  if (path.startsWith('/admin') && (!currentUser || !currentUser.isAdmin)) {
+    window.history.replaceState({}, '', '/');
+    path = '/';
+  }
+
   let component = routes[path];
   let id = null;
 
