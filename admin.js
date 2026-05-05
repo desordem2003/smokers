@@ -183,8 +183,6 @@ function renderDashboard() {
     </div>
   `;
 
-  `;
-
   renderPageContent();
 }
 
