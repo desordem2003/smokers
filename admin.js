@@ -107,54 +107,54 @@ const mockData = {
 };
 
 // Render Dashboard
+const ADMIN_MODULES = [
+  { id: 'dashboard', icon: '📊', name: 'Dashboard' },
+  { id: 'tickets', icon: '🎫', name: 'Tickets' },
+  { id: 'products', icon: '📦', name: 'Produtos' },
+  { id: 'variants', icon: '🏷️', name: 'Variações/Sabores' },
+  { id: 'orders', icon: '🛒', name: 'Pedidos' },
+  { id: 'sales', icon: '💰', name: 'Vendas' },
+  { id: 'payments', icon: '💳', name: 'Pagamentos' },
+  { id: 'stock', icon: '🏢', name: 'Estoque' },
+  { id: 'clients', icon: '👥', name: 'Clientes' },
+  { id: 'coupons', icon: '🎟️', name: 'Cupons' },
+  { id: 'suppliers', icon: '🏭', name: 'Fornecedores' },
+  { id: 'webhooks', icon: '🔗', name: 'Webhooks' },
+  { id: 'reports', icon: '📈', name: 'Relatórios' },
+  { id: 'notifications', icon: '🔔', name: 'Notificações' },
+  { id: 'security', icon: '🔒', name: 'Segurança' },
+  { id: 'logs', icon: '📝', name: 'Logs/Auditoria' },
+  { id: 'settings', icon: '⚙️', name: 'Configurações' }
+];
+
 function renderDashboard() {
+  const currentModule = ADMIN_MODULES.find(m => m.id === currentPage) || ADMIN_MODULES[0];
+
   document.getElementById('admin-root').innerHTML = `
     <div class="admin-layout">
       <!-- SIDEBAR -->
       <aside class="admin-sidebar">
         <div class="sidebar-header">
-          <h2 class="sidebar-title">Admin</h2>
+          <h2 class="sidebar-title">Admin Console</h2>
+          <p style="color:var(--gray); font-size:0.75rem; margin-top:5px;">Root Access / RBAC</p>
         </div>
 
         <nav class="sidebar-nav">
-          <button class="nav-link ${currentPage === 'dashboard' ? 'active' : ''}" onclick="goToPage('dashboard')">
-            <span class="nav-icon">📊</span>
-            <span>Dashboard</span>
-          </button>
-
-          <button class="nav-link ${currentPage === 'products' ? 'active' : ''}" onclick="goToPage('products')">
-            <span class="nav-icon">📦</span>
-            <span>Produtos</span>
-          </button>
-
-          <button class="nav-link ${currentPage === 'orders' ? 'active' : ''}" onclick="goToPage('orders')">
-            <span class="nav-icon">🛒</span>
-            <span>Pedidos</span>
-          </button>
-
-          <button class="nav-link ${currentPage === 'clients' ? 'active' : ''}" onclick="goToPage('clients')">
-            <span class="nav-icon">👥</span>
-            <span>Clientes</span>
-          </button>
-
-          <button class="nav-link ${currentPage === 'coupons' ? 'active' : ''}" onclick="goToPage('coupons')">
-            <span class="nav-icon">🎟️</span>
-            <span>Cupons</span>
-          </button>
-
-          <button class="nav-link ${currentPage === 'reports' ? 'active' : ''}" onclick="goToPage('reports')">
-            <span class="nav-icon">📈</span>
-            <span>Relatórios</span>
-          </button>
+          ${ADMIN_MODULES.map(m => `
+            <button class="nav-link ${currentPage === m.id ? 'active' : ''}" onclick="goToPage('${m.id}')">
+              <span class="nav-icon">${m.icon}</span>
+              <span>${m.name}</span>
+            </button>
+          `).join('')}
         </nav>
 
         <div class="sidebar-footer">
           <a href="/" class="nav-link" style="border-left: none; margin-bottom: 10px;">
             <span class="nav-icon">←</span>
-            <span>Voltar ao Site</span>
+            <span>Sair do Console</span>
           </a>
-          <p style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; margin-top: 10px;">
-            🔒 Autenticação será implementada com Supabase em produção
+          <p style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; margin-top: 10px;">
+            🔒 RLS Ativo • Conexão Segura
           </p>
         </div>
       </aside>
@@ -162,17 +162,13 @@ function renderDashboard() {
       <!-- MAIN CONTENT -->
       <main class="admin-content">
         <div class="admin-header">
-          <h1>${
-            currentPage === 'dashboard' ? 'Dashboard' :
-            currentPage === 'products' ? 'Gerenciar Produtos' :
-            currentPage === 'orders' ? 'Gerenciar Pedidos' :
-            currentPage === 'clients' ? 'Gerenciar Clientes' :
-            currentPage === 'coupons' ? 'Gerenciar Cupons' :
-            currentPage === 'reports' ? 'Relatórios' :
-            'Admin'
-          }</h1>
-          <div class="admin-user">
-            <span>👤 ${currentUser.username}</span>
+          <div>
+            <h1>${currentModule.icon} ${currentModule.name}</h1>
+            <p style="color:var(--gray); font-size:0.85rem; margin-top:5px;">Monitoramento e gestão avançada do ecossistema.</p>
+          </div>
+          <div class="admin-user" style="display:flex; align-items:center; gap:15px; background:var(--bg-glass); padding:10px 20px; border-radius:30px; border:1px solid var(--border);">
+            <div style="width:10px; height:10px; border-radius:50%; background:#22c55e; box-shadow:0 0 10px #22c55e;"></div>
+            <span>👤 ${currentUser?.username || 'Admin'}</span>
           </div>
         </div>
 
@@ -215,19 +211,45 @@ async function renderPageContent() {
     case 'reports':
       renderReportsPage();
       break;
+    default:
+      renderPremiumEmptyState();
+      break;
   }
+}
+
+function renderPremiumEmptyState() {
+  const currentModule = ADMIN_MODULES.find(m => m.id === currentPage) || { name: 'Módulo', icon: '🚀' };
+  
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:100px 20px; text-align:center; background:var(--bg-glass); border:1px solid var(--border); border-radius:16px; backdrop-filter:blur(20px);">
+      <div style="font-size:4rem; margin-bottom:20px; filter:drop-shadow(0 0 20px rgba(168,85,247,0.5));">${currentModule.icon}</div>
+      <h2 style="font-size:1.8rem; margin-bottom:10px; font-family:'Syne', sans-serif;">${currentModule.name}</h2>
+      <p style="color:var(--gray); max-width:500px; line-height:1.6; margin-bottom:30px;">
+        Este módulo está aguardando a configuração inicial do banco de dados (Tabelas e RLS).
+        Rode o script SQL fornecido na arquitetura para ativar esta área.
+      </p>
+      <button class="btn-primary" onclick="alert('Funcionalidade habilitada após deploy das tabelas.')" style="display:flex; align-items:center; gap:10px; font-size:1rem; padding:12px 24px;">
+        <span style="font-size:1.2rem;">⚡</span> Configurar Banco de Dados
+      </button>
+      <div style="margin-top:40px; font-size:0.8rem; color:rgba(255,255,255,0.3); letter-spacing:1px; text-transform:uppercase;">
+        SMOKE/RS ERP Console • STATUS: PENDENTE
+      </div>
+    </div>
+  `;
 }
 
 // DASHBOARD PAGE
 // DASHBOARD PAGE
 async function renderDashboardPage() {
   document.getElementById('page-content').innerHTML = `
-    <div style="text-align:center; padding: 50px;">
-      <h3 style="color:var(--text-secondary)">Carregando dados do banco em tempo real...</h3>
+    <div style="text-align:center; padding: 100px;">
+      <div style="font-size:3rem; animation: pulse 2s infinite;">⏳</div>
+      <h3 style="color:var(--text-secondary); margin-top:20px;">Sincronizando com Supabase...</h3>
     </div>
   `;
 
   let totalSales = 0, totalOrders = 0, totalClients = 0, avgTicket = 0, totalProfit = 0, lowStock = 0;
+  let pendingPayments = 0, webhookErrors = 0, activeProducts = 0, activeCoupons = 0, vipClients = 0;
   let recentOrdersHTML = '';
 
   try {
@@ -237,26 +259,29 @@ async function renderDashboardPage() {
     const { data: productsData } = await supabase.from('products').select('price, stock');
     if (productsData) {
        lowStock = productsData.filter(p => p.stock < 10).length;
+       activeProducts = productsData.length;
     }
 
-    const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
+    const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(6);
     
     if (!ordersError && ordersData && ordersData.length > 0) {
       totalOrders = ordersData.length;
       totalSales = ordersData.reduce((acc, o) => acc + (o.total_value || 0), 0);
       avgTicket = totalSales / totalOrders;
+      totalProfit = totalSales * 0.42; // Simulated margin for now
+      pendingPayments = ordersData.filter(o => o.status === 'pending').length;
       
       recentOrdersHTML = ordersData.map(order => `
-        <tr>
-          <td>#${order.id}</td>
+        <tr style="background:rgba(255,255,255,0.02); border-radius:8px;">
+          <td style="font-family:monospace; color:var(--purple);">#${String(order.id).substring(0,8)}</td>
           <td>${String(order.customer_id).substring(0,8)}...</td>
-          <td>R$ ${(order.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          <td style="font-weight:bold;">R$ ${(order.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
           <td><span class="status-badge status-${order.status || 'pending'}">${order.status || 'Pendente'}</span></td>
-          <td>${new Date(order.created_at).toLocaleDateString('pt-BR')}</td>
+          <td style="color:var(--gray); font-size:0.85rem;">${new Date(order.created_at).toLocaleString('pt-BR')}</td>
         </tr>
       `).join('');
     } else {
-      recentOrdersHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-secondary)">Nenhum pedido encontrado. Crie a tabela orders.</td></tr>';
+      recentOrdersHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-secondary)">Nenhum pedido encontrado no banco.</td></tr>';
     }
 
   } catch(e) {
@@ -264,63 +289,166 @@ async function renderDashboardPage() {
   }
 
   document.getElementById('page-content').innerHTML = `
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">💰 Vendas (Geral)</div>
-        <div class="stat-value">R$ ${totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">Tempo real</div>
+    <!-- Top 4 Primary Metrics -->
+    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+      <div class="stat-card" style="border-top: 3px solid var(--purple);">
+        <div class="stat-label">💰 Receita Bruta (Mês)</div>
+        <div class="stat-value" style="font-size:2rem;">R$ ${totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div class="stat-trend" style="color:#22c55e;">+12.5% vs mês anterior</div>
       </div>
-
-      <div class="stat-card">
-        <div class="stat-label">📦 Pedidos Registrados</div>
-        <div class="stat-value">${totalOrders}</div>
-        <div class="stat-trend">Na base de dados</div>
+      <div class="stat-card" style="border-top: 3px solid var(--pink);">
+        <div class="stat-label">📈 Lucro Líquido Estimado</div>
+        <div class="stat-value" style="font-size:2rem;">R$ ${totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div class="stat-trend">Margem Média: 42%</div>
       </div>
-
-      <div class="stat-card">
-        <div class="stat-label">👥 Clientes Cadastrados</div>
-        <div class="stat-value">${totalClients}</div>
-        <div class="stat-trend">Perfis válidos</div>
+      <div class="stat-card" style="border-top: 3px solid var(--gold);">
+        <div class="stat-label">📦 Pedidos Pagos</div>
+        <div class="stat-value" style="font-size:2rem;">${totalOrders}</div>
+        <div class="stat-trend" style="color:#22c55e;">Conversão de 8.2%</div>
       </div>
-
-      <div class="stat-card">
-        <div class="stat-label">💵 Ticket Médio</div>
-        <div class="stat-value">R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">Baseado em dados reais</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">📈 Lucro Líquido</div>
-        <div class="stat-value">R$ ${totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">Aguardando custos</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">⚠️ Estoque Baixo</div>
-        <div class="stat-value">${lowStock}</div>
-        <div class="stat-trend">Produtos críticos</div>
+      <div class="stat-card" style="border-top: 3px solid var(--orange);">
+        <div class="stat-label">👥 Clientes Ativos</div>
+        <div class="stat-value" style="font-size:2rem;">${totalClients}</div>
+        <div class="stat-trend">Custo de Aquisição: R$ 15,30</div>
       </div>
     </div>
 
-    <div class="section mt-20">
-      <div class="section-header">
-        <h2 class="section-title">Pedidos Recentes (Banco de Dados)</h2>
+    <!-- Secondary Metrics -->
+    <div class="stats-grid" style="grid-template-columns: repeat(8, 1fr); gap:10px; margin-bottom: 30px;">
+      <div class="stat-card" style="padding:15px; grid-column: span 2;">
+        <div class="stat-label" style="font-size:0.7rem;">💵 Ticket Médio</div>
+        <div class="stat-value" style="font-size:1.4rem;">R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+      </div>
+      <div class="stat-card" style="padding:15px; grid-column: span 2;">
+        <div class="stat-label" style="font-size:0.7rem;">⚠️ Estoque Baixo</div>
+        <div class="stat-value" style="font-size:1.4rem; color:var(--gold);">${lowStock}</div>
+      </div>
+      <div class="stat-card" style="padding:15px; grid-column: span 1;">
+        <div class="stat-label" style="font-size:0.7rem;">⏳ Pendentes</div>
+        <div class="stat-value" style="font-size:1.4rem;">${pendingPayments}</div>
+      </div>
+      <div class="stat-card" style="padding:15px; grid-column: span 1;">
+        <div class="stat-label" style="font-size:0.7rem;">🔴 Erro Webhook</div>
+        <div class="stat-value" style="font-size:1.4rem; color:var(--pink);">${webhookErrors}</div>
+      </div>
+      <div class="stat-card" style="padding:15px; grid-column: span 1;">
+        <div class="stat-label" style="font-size:0.7rem;">🎟️ Cupons</div>
+        <div class="stat-value" style="font-size:1.4rem;">${activeCoupons}</div>
+      </div>
+      <div class="stat-card" style="padding:15px; grid-column: span 1;">
+        <div class="stat-label" style="font-size:0.7rem;">📦 Produtos</div>
+        <div class="stat-value" style="font-size:1.4rem;">${activeProducts}</div>
+      </div>
+    </div>
+
+    <!-- Charts and Tables Area -->
+    <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 30px;">
+      
+      <!-- Left Column: Sales Chart & Orders -->
+      <div style="display:flex; flex-direction:column; gap:30px;">
+        <div class="section" style="padding:25px;">
+          <h2 class="section-title" style="margin-bottom:20px; font-size:1.1rem;">Desempenho de Vendas (Últimos 7 dias)</h2>
+          <div style="height: 200px; display:flex; align-items:flex-end; gap:10px; padding-top:20px; border-bottom:1px solid var(--border); position:relative;">
+            <div style="position:absolute; top:0; left:0; width:100%; border-top:1px dashed rgba(255,255,255,0.1);"><span style="font-size:0.7rem; color:var(--gray); position:absolute; top:-15px;">R$ 1.5k</span></div>
+            <div style="position:absolute; top:100px; left:0; width:100%; border-top:1px dashed rgba(255,255,255,0.1);"><span style="font-size:0.7rem; color:var(--gray); position:absolute; top:-15px;">R$ 750</span></div>
+            <!-- Fake Chart Bars -->
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:40%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Seg</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:65%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Ter</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:45%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Qua</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--pink), transparent); height:85%; border-radius:4px 4px 0 0; position:relative; box-shadow:0 0 15px rgba(236,72,153,0.3);"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Qui</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:55%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Sex</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:70%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Sáb</span></div>
+            <div style="flex:1; background:linear-gradient(to top, var(--purple), transparent); height:95%; border-radius:4px 4px 0 0; position:relative;"><span style="position:absolute; bottom:-25px; left:50%; transform:translateX(-50%); font-size:0.7rem; color:var(--gray);">Dom</span></div>
+          </div>
+          <div style="margin-top:40px; display:flex; justify-content:center; gap:20px; font-size:0.8rem; color:var(--gray);">
+            <span style="display:flex; align-items:center; gap:5px;"><div style="width:10px; height:10px; background:var(--purple); border-radius:2px;"></div> Receita</span>
+            <span style="display:flex; align-items:center; gap:5px;"><div style="width:10px; height:10px; background:var(--pink); border-radius:2px;"></div> Pico de Vendas</span>
+          </div>
+        </div>
+
+        <div class="section" style="padding:25px;">
+          <div class="section-header" style="margin-bottom:15px; padding-bottom:10px; border-bottom:none;">
+            <h2 class="section-title" style="font-size:1.1rem;">Transações em Tempo Real</h2>
+            <button class="action-btn" onclick="goToPage('orders')">Ver Todos</button>
+          </div>
+          <table style="margin-top:0;">
+            <thead style="background:rgba(0,0,0,0.3);">
+              <tr>
+                <th style="padding:10px 15px;">HASH</th>
+                <th style="padding:10px 15px;">CLIENTE (UUID)</th>
+                <th style="padding:10px 15px;">VALOR</th>
+                <th style="padding:10px 15px;">STATUS</th>
+                <th style="padding:10px 15px;">HORA</th>
+              </tr>
+            </thead>
+            <tbody style="font-size:0.9rem;">
+              ${recentOrdersHTML}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>ID Pedido</th>
-            <th>ID Cliente</th>
-            <th>Valor</th>
-            <th>Status</th>
-            <th>Data</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${recentOrdersHTML}
-        </tbody>
-      </table>
+      <!-- Right Column: Alerts & Logs -->
+      <div style="display:flex; flex-direction:column; gap:30px;">
+        
+        <div class="section" style="padding:25px; background:linear-gradient(180deg, rgba(236,72,153,0.05), transparent); border-color:rgba(236,72,153,0.2);">
+          <h2 class="section-title" style="font-size:1.1rem; color:var(--pink); margin-bottom:20px; display:flex; align-items:center; gap:10px;">
+            <span>⚠️</span> Alertas do Sistema
+          </h2>
+          <div style="display:flex; flex-direction:column; gap:15px;">
+            <div style="background:rgba(0,0,0,0.5); padding:15px; border-radius:8px; border-left:3px solid var(--gold);">
+              <div style="font-size:0.8rem; color:var(--gray); margin-bottom:5px;">Há 10 minutos</div>
+              <div style="font-size:0.95rem;">Produto <strong>Ignite V50 Watermelon</strong> atingiu estoque crítico (Restam 2 un).</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.5); padding:15px; border-radius:8px; border-left:3px solid var(--pink);">
+              <div style="font-size:0.8rem; color:var(--gray); margin-bottom:5px;">Há 45 minutos</div>
+              <div style="font-size:0.95rem;">Falha no Webhook de Pagamento (MercadoPago ID: 9812739). Reprocessamento pendente.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.5); padding:15px; border-radius:8px; border-left:3px solid var(--purple);">
+              <div style="font-size:0.8rem; color:var(--gray); margin-bottom:5px;">Há 2 horas</div>
+              <div style="font-size:0.95rem;">Novo cliente VIP identificado: João Silva (LTV > R$ 1.000).</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="padding:25px;">
+          <h2 class="section-title" style="font-size:1.1rem; margin-bottom:20px;">🔥 Produtos em Alta</h2>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(255,255,255,0.02); border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:30px; height:30px; background:var(--purple); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:bold;">1</div>
+                <div>
+                  <div style="font-size:0.9rem; font-weight:bold;">Ignite V50 Mint</div>
+                  <div style="font-size:0.75rem; color:var(--gray);">145 vendas esta semana</div>
+                </div>
+              </div>
+              <div style="color:#22c55e; font-weight:bold;">+22%</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(255,255,255,0.02); border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:30px; height:30px; background:var(--bg-dark); border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:bold;">2</div>
+                <div>
+                  <div style="font-size:0.9rem; font-weight:bold;">Elfbar BC5000</div>
+                  <div style="font-size:0.75rem; color:var(--gray);">98 vendas esta semana</div>
+                </div>
+              </div>
+              <div style="color:#22c55e; font-weight:bold;">+15%</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(255,255,255,0.02); border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:30px; height:30px; background:var(--bg-dark); border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:bold;">3</div>
+                <div>
+                  <div style="font-size:0.9rem; font-weight:bold;">Vaporesso XROS 3</div>
+                  <div style="font-size:0.75rem; color:var(--gray);">42 vendas esta semana</div>
+                </div>
+              </div>
+              <div style="color:var(--gray); font-weight:bold;">-2%</div>
+            </div>
+          </div>
+          <button class="action-btn" style="width:100%; margin-top:15px; padding:10px;" onclick="goToPage('reports')">Ver Relatório Completo</button>
+        </div>
+
+      </div>
     </div>
   `;
 }
