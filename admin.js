@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderDashboard();
 
   } catch (error) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.error('[DEV ONLY] Admin Auth Error:', error.message);
+    }
     // Falha na validação: Simula página quebrada/inexistente sem dar pistas
     document.body.innerHTML = '';
     document.body.style.display = 'block';
