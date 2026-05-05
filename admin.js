@@ -183,6 +183,8 @@ function renderDashboard() {
     </div>
   `;
 
+  `;
+
   renderPageContent();
 }
 
@@ -193,12 +195,12 @@ function goToPage(page) {
   console.log('Page rendered:', page);
 }
 
-function renderPageContent() {
+async function renderPageContent() {
   const content = document.getElementById('page-content');
 
   switch(currentPage) {
     case 'dashboard':
-      renderDashboardPage();
+      await renderDashboardPage();
       break;
     case 'products':
       renderProductsPage();
@@ -219,76 +221,106 @@ function renderPageContent() {
 }
 
 // DASHBOARD PAGE
-function renderDashboardPage() {
-  const stats = mockData.stats;
-  const totalProfit = mockData.products.reduce((sum, p) => {
-    return sum + ((p.price - p.costPrice) * (Math.random() * 50)); // Simulated sales
-  }, 0);
+// DASHBOARD PAGE
+async function renderDashboardPage() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="text-align:center; padding: 50px;">
+      <h3 style="color:var(--text-secondary)">Carregando dados do banco em tempo real...</h3>
+    </div>
+  `;
+
+  let totalSales = 0, totalOrders = 0, totalClients = 0, avgTicket = 0, totalProfit = 0, lowStock = 0;
+  let recentOrdersHTML = '';
+
+  try {
+    const { count: clientsCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+    totalClients = clientsCount || 0;
+
+    const { data: productsData } = await supabase.from('products').select('price, stock');
+    if (productsData) {
+       lowStock = productsData.filter(p => p.stock < 10).length;
+    }
+
+    const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(5);
+    
+    if (!ordersError && ordersData && ordersData.length > 0) {
+      totalOrders = ordersData.length;
+      totalSales = ordersData.reduce((acc, o) => acc + (o.total_value || 0), 0);
+      avgTicket = totalSales / totalOrders;
+      
+      recentOrdersHTML = ordersData.map(order => `
+        <tr>
+          <td>#${order.id}</td>
+          <td>${String(order.customer_id).substring(0,8)}...</td>
+          <td>R$ ${(order.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          <td><span class="status-badge status-${order.status || 'pending'}">${order.status || 'Pendente'}</span></td>
+          <td>${new Date(order.created_at).toLocaleDateString('pt-BR')}</td>
+        </tr>
+      `).join('');
+    } else {
+      recentOrdersHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-secondary)">Nenhum pedido encontrado. Crie a tabela orders.</td></tr>';
+    }
+
+  } catch(e) {
+    console.error("Erro ao buscar dados reais do Dashboard:", e);
+  }
 
   document.getElementById('page-content').innerHTML = `
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">💰 Vendas do Mês</div>
-        <div class="stat-value">R$ ${stats.totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">↑ 12% vs mês anterior</div>
+        <div class="stat-label">💰 Vendas (Geral)</div>
+        <div class="stat-value">R$ ${totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div class="stat-trend">Tempo real</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">📦 Total de Pedidos</div>
-        <div class="stat-value">${stats.totalOrders}</div>
-        <div class="stat-trend">3 novos hoje</div>
+        <div class="stat-label">📦 Pedidos Registrados</div>
+        <div class="stat-value">${totalOrders}</div>
+        <div class="stat-trend">Na base de dados</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">👥 Clientes</div>
-        <div class="stat-value">${stats.totalClients}</div>
-        <div class="stat-trend">2 novos clientes</div>
+        <div class="stat-label">👥 Clientes Cadastrados</div>
+        <div class="stat-value">${totalClients}</div>
+        <div class="stat-trend">Perfis válidos</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-label">💵 Ticket Médio</div>
-        <div class="stat-value">R$ ${stats.avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">↑ 5% vs período anterior</div>
+        <div class="stat-value">R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div class="stat-trend">Baseado em dados reais</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-label">📈 Lucro Líquido</div>
         <div class="stat-value">R$ ${totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-        <div class="stat-trend">Margem: 35-45%</div>
+        <div class="stat-trend">Aguardando custos</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-label">⚠️ Estoque Baixo</div>
-        <div class="stat-value">${mockData.products.filter(p => p.stock < 10).length}</div>
-        <div class="stat-trend">Produtos para reabastecer</div>
+        <div class="stat-value">${lowStock}</div>
+        <div class="stat-trend">Produtos críticos</div>
       </div>
     </div>
 
     <div class="section mt-20">
       <div class="section-header">
-        <h2 class="section-title">Pedidos Recentes</h2>
+        <h2 class="section-title">Pedidos Recentes (Banco de Dados)</h2>
       </div>
 
       <table>
         <thead>
           <tr>
             <th>ID Pedido</th>
-            <th>Cliente</th>
+            <th>ID Cliente</th>
             <th>Valor</th>
             <th>Status</th>
             <th>Data</th>
           </tr>
         </thead>
         <tbody>
-          ${mockData.orders.map(order => `
-            <tr>
-              <td>#${order.id}</td>
-              <td>${order.client}</td>
-              <td>R$ ${order.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-              <td><span class="status-badge status-${order.status}">${order.status}</span></td>
-              <td>${order.date}</td>
-            </tr>
-          `).join('')}
+          ${recentOrdersHTML}
         </tbody>
       </table>
     </div>
