@@ -237,15 +237,20 @@ img {
 .hero-image-container {
   position: relative;
   width: 100%;
+  min-height: 400px;
   height: auto;
   overflow: hidden;
   background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-bg-img {
   width: 100%;
   height: auto;
-  object-fit: contain;
+  min-height: 400px;
+  object-fit: cover;
   display: block;
 }
 

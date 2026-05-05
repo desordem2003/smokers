@@ -1,9 +1,9 @@
 export const Home = async () => {
   return `
-    <section id="hero">
-      <div class="hero-image-container">
-        <img src="/assets/hero_banner.jpg" alt="SMOKE/RS Hero" class="hero-bg-img" fetchpriority="high" loading="eager">
-        <div class="hero-overlay"></div>
+    <section id="hero" style="background: #000; overflow: hidden;">
+      <div class="hero-image-container" style="min-height: 500px; display: flex; align-items: center; justify-content: center; position: relative;">
+        <img src="/assets/hero_neon_banner.png" alt="SMOKE/RS Hero" class="hero-bg-img" fetchpriority="high" loading="eager" style="width: 100%; height: auto; display: block; min-height: 500px; object-fit: cover;">
+        <div class="hero-overlay" style="position: absolute; inset: 0; background: linear-gradient(to top, #050507 0%, transparent 60%);"></div>
         <div class="hero-info-bar">
           <div class="container info-flex">
             <div class="info-item"><span>MELHOR FORNECEDOR DO ESTADO E REGIÕES</span></div>
