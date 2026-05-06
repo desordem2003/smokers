@@ -524,6 +524,13 @@ window.handleDiscountChange = function() {
 
 window.currentProductId = null;
 
+// Helper function to safely get values
+window.getValue = function(id) {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Campo não encontrado na interface: ${id}`);
+  return el.value;
+};
+
 window.saveProduct = async function(e) {
   e.preventDefault();
   const form = e.target;
@@ -532,21 +539,31 @@ window.saveProduct = async function(e) {
   submitBtn.innerHTML = 'Salvando...';
 
   try {
+    const name = window.getValue('product-name');
+    const brand = window.getValue('product-brand');
+    const flavor = window.getValue('product-flavor');
+    const sale_price = parseFloat(window.getValue('product-price')) || 0;
+
+    if (!name || !brand || !flavor || sale_price <= 0) {
+      throw new Error('Preencha todos os campos obrigatórios (Nome, Marca, Sabor e Preço).');
+    }
+
     const product = {
-      name: document.getElementById('product-name').value,
-      brand: document.getElementById('product-brand').value,
-      flavor: document.getElementById('product-flavor').value,
-      quantity: parseInt(document.getElementById('product-quantity').value) || 0,
-      cost_price: parseFloat(document.getElementById('product-cost').value) || 0,
-      sale_price: parseFloat(document.getElementById('product-price').value) || 0,
-      margin_percent: parseFloat(document.getElementById('product-margin').value) || 0,
-      profit_per_unit: parseFloat(document.getElementById('product-profit').value) || 0,
-      is_promotion: document.getElementById('product-promo').value === 'true',
-      discount_type: document.getElementById('product-discount-type').value,
-      discount_value: parseFloat(document.getElementById('product-discount-value').value) || 0,
-      final_price: parseFloat(document.getElementById('product-final-price').value) || 0,
-      image_url: document.getElementById('product-img-url').value,
-      status: 'active'
+      name: name,
+      brand: brand,
+      flavor: flavor,
+      quantity: parseInt(window.getValue('product-quantity')) || 0,
+      cost_price: parseFloat(window.getValue('product-cost')) || 0,
+      sale_price: sale_price,
+      margin_percent: parseFloat(window.getValue('product-margin')) || 0,
+      profit_per_unit: parseFloat(window.getValue('product-profit')) || 0,
+      is_promotion: window.getValue('product-promo') === 'true',
+      discount_type: window.getValue('product-discount-type'),
+      discount_value: parseFloat(window.getValue('product-discount-value')) || 0,
+      final_price: parseFloat(window.getValue('product-final-price')) || 0,
+      image_url: window.getValue('product-img-url'),
+      status: 'active',
+      updated_at: new Date().toISOString()
     };
 
     if (window.currentProductId) {
@@ -565,6 +582,7 @@ window.saveProduct = async function(e) {
     await window.loadProducts(); // Refresh dynamic table without full reload
   } catch (err) {
     showToast('Erro ao salvar produto: ' + err.message, 'error');
+    console.error(err);
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = 'Salvar Produto';
@@ -639,15 +657,22 @@ window.editProduct = async function(id) {
 };
 
 window.deleteProduct = async function(id) {
-  if (!confirm('Deseja realmente desativar este produto? (Soft Delete)')) return;
+  if (!confirm('Deseja realmente excluir este produto?')) return;
   
   try {
-    const { error } = await supabase.from('products').update({ status: 'inactive' }).eq('id', id);
+    const { error } = await supabase.from('products')
+      .update({ 
+        status: 'inactive', 
+        deleted_at: new Date().toISOString() 
+      })
+      .eq('id', id);
+      
     if (error) throw error;
-    showToast('Produto desativado com sucesso.', 'success');
+    showToast('Produto excluído com sucesso.', 'success');
     await window.loadProducts();
   } catch (err) {
     showToast('Erro ao excluir produto.', 'error');
+    console.error(err);
   }
 };
 
@@ -658,12 +683,16 @@ window.loadProducts = async function() {
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px;">⏳ Carregando produtos...</td></tr>';
   
   try {
-    // Only fetch active products to simulate soft-delete correctly
-    const { data: products, error } = await supabase.from('products').select('*').eq('status', 'active').order('created_at', { ascending: false });
+    const { data: products, error } = await supabase.from('products')
+      .select('*')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+      
     if (error) throw error;
     window.renderProductsTable(products);
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--pink)">Erro ao carregar dados do banco.</td></tr>';
+    console.error(err);
   }
 };
 
