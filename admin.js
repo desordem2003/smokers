@@ -522,6 +522,8 @@ window.handleDiscountChange = function() {
   document.getElementById('product-final-price').value = finalPrice > 0 ? finalPrice.toFixed(2) : salePrice.toFixed(2);
 };
 
+window.currentProductId = null;
+
 window.saveProduct = async function(e) {
   e.preventDefault();
   const form = e.target;
@@ -547,21 +549,54 @@ window.saveProduct = async function(e) {
       status: 'active'
     };
 
-    const { error } = await supabase.from('products').insert([product]);
-    if (error) throw error;
+    if (window.currentProductId) {
+      // Edit
+      const { error } = await supabase.from('products').update(product).eq('id', window.currentProductId);
+      if (error) throw error;
+      showToast('Produto atualizado com sucesso!', 'success');
+    } else {
+      // Create
+      const { error } = await supabase.from('products').insert([product]);
+      if (error) throw error;
+      showToast('Produto salvo com sucesso!', 'success');
+    }
     
-    alert('Produto salvo com sucesso!');
     closeProductForm();
-    renderProductsPage(); // Refresh table
+    await window.loadProducts(); // Refresh dynamic table without full reload
   } catch (err) {
-    alert('Erro ao salvar produto: ' + err.message);
+    showToast('Erro ao salvar produto: ' + err.message, 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = 'Salvar Produto';
   }
 };
 
+window.showToast = function(msg, type='success') {
+  // Simple fallback toast if not implemented globally
+  alert(msg);
+};
+
 window.showProductForm = function() {
+  window.currentProductId = null;
+  document.getElementById('product-form-modal').querySelector('h2').innerText = 'Cadastrar Novo Produto';
+  
+  // Clear form
+  document.getElementById('product-name').value = '';
+  document.getElementById('product-brand').value = '';
+  document.getElementById('product-flavor').innerHTML = '<option value="">Selecione a marca primeiro</option>';
+  document.getElementById('product-quantity').value = '0';
+  document.getElementById('product-cost').value = '0.00';
+  document.getElementById('product-price').value = '0.00';
+  document.getElementById('product-margin').value = '0';
+  document.getElementById('product-profit').value = '0.00';
+  document.getElementById('product-promo').value = 'false';
+  document.getElementById('product-discount-type').value = 'fixed';
+  document.getElementById('product-discount-value').value = '0';
+  document.getElementById('product-final-price').value = '0.00';
+  document.getElementById('product-img-url').value = '/products/placeholders/generic-product.svg';
+  document.getElementById('product-img-preview').src = '/products/placeholders/generic-product.svg';
+  document.getElementById('discount-fields').style.display = 'none';
+
   document.getElementById('product-form-modal').style.display = 'flex';
 };
 
@@ -569,51 +604,107 @@ window.closeProductForm = function() {
   document.getElementById('product-form-modal').style.display = 'none';
 };
 
-// PRODUCTS PAGE
-async function renderProductsPage() {
-  document.getElementById('page-content').innerHTML = `
-    <div style="text-align:center; padding: 50px;">
-      <div style="font-size:3rem; animation: pulse 2s infinite;">⏳</div>
-      <h3 style="color:var(--text-secondary); margin-top:20px;">Sincronizando com Supabase...</h3>
-    </div>
-  `;
-
-  let productsHTML = '';
+window.editProduct = async function(id) {
   try {
-    const { data: products, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    const { data: product, error } = await supabase.from('products').select('*').eq('id', id).single();
+    if (error) throw error;
+
+    window.currentProductId = id;
+    document.getElementById('product-form-modal').querySelector('h2').innerText = 'Editar Produto';
+
+    document.getElementById('product-name').value = product.name || '';
+    document.getElementById('product-brand').value = product.brand || '';
     
-    if (!error && products && products.length > 0) {
-      productsHTML = products.map(p => `
-        <tr style="background:rgba(255,255,255,0.02); border-radius:8px;">
-          <td><img src="${p.image_url || '/products/placeholders/generic-product.svg'}" style="width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid var(--border);"></td>
-          <td>
-            <div style="font-weight:bold;">${p.name}</div>
-            <div style="font-size:0.75rem; color:var(--gray);">${p.brand} • ${p.flavor}</div>
-          </td>
-          <td>${p.quantity} un</td>
-          <td>R$ ${p.cost_price.toFixed(2)}</td>
-          <td style="font-weight:bold; color:var(--purple);">R$ ${p.sale_price.toFixed(2)}</td>
-          <td>
-            ${p.is_promotion 
-              ? `<span style="background:var(--pink); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">R$ ${p.final_price.toFixed(2)}</span>`
-              : '-'
-            }
-          </td>
-          <td style="color:#22c55e;">${p.margin_percent}%</td>
-          <td><span class="status-badge status-${p.status || 'active'}">${p.status === 'active' ? 'Ativo' : 'Inativo'}</span></td>
-          <td>
-            <button class="action-btn" onclick="alert('Edição de produto em breve')">✏️</button>
-            <button class="action-btn danger" onclick="alert('Exclusão em breve')">🗑️</button>
-          </td>
-        </tr>
-      `).join('');
-    } else {
-      productsHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary)">Nenhum produto cadastrado ainda.</td></tr>';
-    }
-  } catch(e) {
-    productsHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--pink)">Erro de conexão com o banco de dados.</td></tr>';
+    // Trigger flavor population
+    window.handleBrandChange(product.brand);
+    // Set actual flavor
+    setTimeout(() => {
+      document.getElementById('product-flavor').value = product.flavor || '';
+    }, 100);
+
+    document.getElementById('product-quantity').value = product.quantity || 0;
+    document.getElementById('product-cost').value = product.cost_price || 0;
+    document.getElementById('product-price').value = product.sale_price || 0;
+    document.getElementById('product-promo').value = product.is_promotion ? 'true' : 'false';
+    document.getElementById('product-discount-type').value = product.discount_type || 'fixed';
+    document.getElementById('product-discount-value').value = product.discount_value || 0;
+    document.getElementById('product-img-url').value = product.image_url || '';
+    document.getElementById('product-img-preview').src = product.image_url || '/products/placeholders/generic-product.svg';
+
+    window.handlePricingChange(); // Recalculate preview
+    document.getElementById('product-form-modal').style.display = 'flex';
+  } catch (err) {
+    showToast('Erro ao carregar produto para edição.', 'error');
+  }
+};
+
+window.deleteProduct = async function(id) {
+  if (!confirm('Deseja realmente desativar este produto? (Soft Delete)')) return;
+  
+  try {
+    const { error } = await supabase.from('products').update({ status: 'inactive' }).eq('id', id);
+    if (error) throw error;
+    showToast('Produto desativado com sucesso.', 'success');
+    await window.loadProducts();
+  } catch (err) {
+    showToast('Erro ao excluir produto.', 'error');
+  }
+};
+
+window.loadProducts = async function() {
+  const tbody = document.getElementById('products-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px;">⏳ Carregando produtos...</td></tr>';
+  
+  try {
+    // Only fetch active products to simulate soft-delete correctly
+    const { data: products, error } = await supabase.from('products').select('*').eq('status', 'active').order('created_at', { ascending: false });
+    if (error) throw error;
+    window.renderProductsTable(products);
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--pink)">Erro ao carregar dados do banco.</td></tr>';
+  }
+};
+
+window.renderProductsTable = function(products) {
+  const tbody = document.getElementById('products-tbody');
+  if (!tbody) return;
+
+  if (!products || products.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:var(--text-secondary)">Nenhum produto cadastrado.</td></tr>';
+    return;
   }
 
+  tbody.innerHTML = products.map(p => `
+    <tr style="background:rgba(255,255,255,0.02); border-radius:8px;">
+      <td><img src="${p.image_url || '/products/placeholders/generic-product.svg'}" style="width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid var(--border);"></td>
+      <td>
+        <div style="font-weight:bold;">${p.name}</div>
+        <div style="font-size:0.75rem; color:var(--gray);">${p.brand} • ${p.flavor}</div>
+      </td>
+      <td>${p.quantity} un</td>
+      <td>R$ ${Number(p.cost_price || 0).toFixed(2)}</td>
+      <td style="font-weight:bold; color:var(--purple);">R$ ${Number(p.sale_price || 0).toFixed(2)}</td>
+      <td>
+        ${p.is_promotion 
+          ? `<span style="background:var(--pink); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">R$ ${Number(p.final_price || 0).toFixed(2)}</span>`
+          : '-'
+        }
+      </td>
+      <td style="color:#22c55e;">${p.margin_percent}%</td>
+      <td><span class="status-badge status-${p.status || 'active'}">${p.status === 'active' ? 'Ativo' : 'Inativo'}</span></td>
+      <td>
+        <button class="action-btn" onclick="editProduct('${p.id}')">✏️</button>
+        <button class="action-btn danger" onclick="deleteProduct('${p.id}')">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+};
+
+// PRODUCTS PAGE
+async function renderProductsPage() {
+  // Render empty scaffolding immediately
   document.getElementById('page-content').innerHTML = `
     <div class="section">
       <div class="section-header">
@@ -640,8 +731,8 @@ async function renderProductsPage() {
               <th>AÇÕES</th>
             </tr>
           </thead>
-          <tbody style="font-size:0.9rem;">
-            ${productsHTML}
+          <tbody id="products-tbody" style="font-size:0.9rem;">
+            <tr><td colspan="9" style="text-align:center; padding:40px;">⏳ Carregando produtos...</td></tr>
           </tbody>
         </table>
       </div>
@@ -763,6 +854,9 @@ async function renderProductsPage() {
       </div>
     </div>
   `;
+
+  // Start data load
+  window.loadProducts();
 }
 
 // ORDERS PAGE
